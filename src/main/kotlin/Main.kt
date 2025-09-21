@@ -1,26 +1,25 @@
 package org.example
 
 import com.sun.net.httpserver.HttpServer
-import org.example.service.GreetingService
 import org.koin.core.context.startKoin
-import org.koin.mp.KoinPlatform.getKoin
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors
+import org.flywaydb.core.Flyway
+import org.koin.java.KoinJavaComponent.getKoin
 
 fun main() {
     startKoin {
-        modules(appModule)
+        modules(dbModule, appModule)
     }
+
+    val koin = getKoin()
+    val flyway = koin.get<Flyway>()
+    flyway.migrate()
 
     val server = HttpServer.create(InetSocketAddress(8080), 0)
+    val router = Router()
 
-    val greetingService = getKoin().get<GreetingService>()
-
-    server.createContext("/") { exchange ->
-        val response = greetingService.getGreeting()
-        exchange.sendResponseHeaders(200, response.toByteArray().size.toLong())
-        exchange.responseBody.use { it.write(response.toByteArray()) }
-    }
+    server.createContext("/", router::handle)
 
     server.executor = Executors.newVirtualThreadPerTaskExecutor()
     server.start()
